@@ -25,6 +25,10 @@ const reorderedApp = prefs<{ sourceName: AppName; destinationName: AppName }>(
   'app/reordered',
 )
 
+const removedApp = prefs<{ appName: AppName }>('app/removed')
+
+const restoredApp = prefs<{ appName: AppName }>('app/restored')
+
 const clickedHomepageButton = prefs('homepage-button/clicked')
 const clickedOpenIssueButton = prefs('open-issue-button/clicked')
 
@@ -37,7 +41,9 @@ export {
   clickedUpdateButton,
   clickedUpdateRestartButton,
   confirmedReset,
+  removedApp,
   reorderedApp,
+  restoredApp,
   startedPrefs,
   updatedHotCode,
 }

@@ -13,7 +13,9 @@ import {
 } from '../../renderers/picker/state/actions.js'
 import {
   confirmedReset,
+  removedApp,
   reorderedApp,
+  restoredApp,
   updatedHotCode,
 } from '../../renderers/prefs/state/actions.js'
 
@@ -22,6 +24,7 @@ type Storage = {
     name: AppName
     hotCode: string | null
     isInstalled: boolean
+    userRemoved: boolean
   }[]
   supportMessage: number
   isSetup: boolean
@@ -43,16 +46,26 @@ const storage = createReducer<Storage>(defaultStorage, (builder) =>
 
     .addCase(confirmedReset, () => defaultStorage)
 
-    .addCase(
-      receivedRendererStartupSignal,
-      (_, action) => action.payload.storage,
-    )
+    .addCase(receivedRendererStartupSignal, (_, action) => {
+      const storage = action.payload.storage
+      // Migrate existing data to include userRemoved field
+      const migratedApps = storage.apps.map((app) => ({
+        ...app,
+        userRemoved: app.userRemoved ?? false,
+      }))
+      return {
+        ...storage,
+        apps: migratedApps,
+      }
+    })
 
     .addCase(retrievedInstalledApps, (state, action) => {
       const installedAppNames = action.payload
 
       for (const storedApp of state.apps) {
-        storedApp.isInstalled = installedAppNames.includes(storedApp.name)
+        const isSystemInstalled = installedAppNames.includes(storedApp.name)
+        // Only show app if it's installed AND not manually removed by user
+        storedApp.isInstalled = isSystemInstalled && !storedApp.userRemoved
       }
 
       for (const installedAppName of installedAppNames) {
@@ -65,6 +78,7 @@ const storage = createReducer<Storage>(defaultStorage, (builder) =>
             hotCode: null,
             isInstalled: true,
             name: installedAppName,
+            userRemoved: false,
           })
         }
       }
@@ -111,6 +125,30 @@ const storage = createReducer<Storage>(defaultStorage, (builder) =>
 
       const [removed] = state.apps.splice(sourceIndex, 1)
       state.apps.splice(destinationIndex, 0, removed)
+    })
+
+    .addCase(removedApp, (state, action) => {
+      const appIndex = state.apps.findIndex(
+        (app) => app.name === action.payload.appName,
+      )
+
+      if (appIndex !== -1) {
+        state.apps[appIndex].isInstalled = false
+        state.apps[appIndex].userRemoved = true
+      }
+    })
+
+    .addCase(restoredApp, (state, action) => {
+      const appIndex = state.apps.findIndex(
+        (app) => app.name === action.payload.appName,
+      )
+
+      if (appIndex !== -1) {
+        state.apps[appIndex].userRemoved = false
+        // Check if the app is still actually installed on the system
+        // This will be updated correctly on the next scan
+        state.apps[appIndex].isInstalled = true
+      }
     }),
 )
 

@@ -28,6 +28,16 @@ const useInstalledApps = (): InstalledApp[] => {
     }))
 }
 
+const useRemovedApps = (): InstalledApp[] => {
+  const storedApps = useDeepEqualSelector((state) => state.storage.apps)
+  return storedApps
+    .filter((storedApp) => storedApp.userRemoved)
+    .map((storedApp) => ({
+      hotCode: storedApp.hotCode,
+      name: storedApp.name,
+    }))
+}
+
 const useIsSupportMessageHidden = (): boolean => {
   const supportMessageNumber = useSelector(
     (state) => state.storage.supportMessage,
@@ -52,6 +62,7 @@ export {
   useInstalledApps,
   useIsSupportMessageHidden,
   useKeyCodeMap,
+  useRemovedApps,
   useSelector,
   useShallowEqualSelector,
 }
