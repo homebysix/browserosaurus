@@ -25,8 +25,9 @@ import {
   useDeepEqualSelector,
   useInstalledApps,
   useKeyCodeMap,
+  useRemovedApps,
 } from '../../../shared/state/hooks.js'
-import { reorderedApp, updatedHotCode } from '../../state/actions.js'
+import { removedApp, reorderedApp, restoredApp, updatedHotCode } from '../../state/actions.js'
 import { Pane } from '../molecules/pane.js'
 
 type SortableItemProps = {
@@ -65,7 +66,6 @@ const SortableItem = ({
       ref={setNodeRef}
       style={style}
       {...attributes}
-      {...listeners}
       className={clsx(
         'flex',
         'bg-black/5 shadow dark:bg-white/5',
@@ -75,10 +75,16 @@ const SortableItem = ({
           'focus-visible:ring-2 focus-visible:ring-gray-900 dark:focus-visible:ring-gray-100',
       )}
     >
-      <div className="flex w-16 items-center justify-center p-4">
+      <div 
+        {...listeners}
+        className="flex w-16 items-center justify-center p-4 cursor-grab active:cursor-grabbing"
+      >
         {index + 1}
       </div>
-      <div className="flex grow items-center p-4">
+      <div 
+        {...listeners}
+        className="flex grow items-center p-4 cursor-grab active:cursor-grabbing"
+      >
         <img
           alt=""
           className={clsx('mr-4 size-8', !icon && 'hidden')}
@@ -110,6 +116,52 @@ const SortableItem = ({
           value={keyCode}
         />
       </div>
+      <div className="flex items-center justify-center p-4">
+        <button
+          aria-label={`Remove ${name}`}
+          className="flex size-8 items-center justify-center rounded-full bg-red-500/10 text-red-600 hover:bg-red-500/20 hover:text-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:text-red-400 dark:hover:text-red-300"
+          onClick={(event) => {
+            event.stopPropagation()
+            event.preventDefault()
+            dispatch(removedApp({ appName: id }))
+          }}
+          type="button"
+        >
+          ×
+        </button>
+      </div>
+    </div>
+  )
+}
+
+type RemovedAppItemProps = {
+  readonly name: InstalledApp['name']
+  readonly icon?: string
+}
+
+const RemovedAppItem = ({ name, icon = '' }: RemovedAppItemProps) => {
+  const dispatch = useDispatch()
+
+  return (
+    <div className="flex items-center justify-between rounded-lg bg-gray-100 p-3 dark:bg-gray-800">
+      <div className="flex items-center">
+        <img
+          alt=""
+          className={clsx('mr-3 size-6 opacity-50', !icon && 'hidden')}
+          src={icon}
+        />
+        <span className="text-gray-600 dark:text-gray-400">{name}</span>
+      </div>
+      <button
+        aria-label={`Restore ${name}`}
+        className="flex size-6 items-center justify-center rounded-full bg-green-500/10 text-green-600 hover:bg-green-500/20 hover:text-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 dark:text-green-400 dark:hover:text-green-300"
+        onClick={() => {
+          dispatch(restoredApp({ appName: name }))
+        }}
+        type="button"
+      >
+        +
+      </button>
     </div>
   )
 }
@@ -121,6 +173,8 @@ export function AppsPane(): JSX.Element {
     ...installedApp,
     id: installedApp.name,
   }))
+
+  const removedApps = useRemovedApps()
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -146,40 +200,65 @@ export function AppsPane(): JSX.Element {
 
   return (
     <Pane pane="apps">
-      {installedApps.length === 0 && (
+      {installedApps.length === 0 && removedApps.length === 0 && (
         <div className="flex h-full items-center justify-center">
           <Spinner />
         </div>
       )}
 
       <div className="overflow-y-auto p-2">
-        <DndContext
-          collisionDetection={closestCenter}
-          onDragEnd={onDragEnd}
-          sensors={sensors}
-        >
-          <SortableContext
-            items={installedApps}
-            strategy={verticalListSortingStrategy}
-          >
-            {installedApps.map(({ id, name, hotCode }, index) => (
-              <SortableItem
-                key={id}
-                icon={icons[id]}
-                id={id}
-                index={index}
-                keyCode={keyCodeMap[hotCode || '']}
-                name={name}
-              />
-            ))}
-          </SortableContext>
-        </DndContext>
+        {/* Active Apps Section */}
+        {installedApps.length > 0 && (
+          <>
+            <h3 className="mb-4 text-lg font-semibold">Active Apps</h3>
+            <DndContext
+              collisionDetection={closestCenter}
+              onDragEnd={onDragEnd}
+              sensors={sensors}
+            >
+              <SortableContext
+                items={installedApps}
+                strategy={verticalListSortingStrategy}
+              >
+                {installedApps.map(({ id, name, hotCode }, index) => (
+                  <SortableItem
+                    key={id}
+                    icon={icons[id]}
+                    id={id}
+                    index={index}
+                    keyCode={keyCodeMap[hotCode || '']}
+                    name={name}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
+            {installedApps.length > 1 && (
+              <p className="mt-2 text-sm opacity-70">
+                Drag and drop to sort the list of apps.
+              </p>
+            )}
+          </>
+        )}
+
+        {/* Removed Apps Section */}
+        {removedApps.length > 0 && (
+          <div className={clsx('mt-8', installedApps.length === 0 && 'mt-2')}>
+            <h3 className="mb-4 text-lg font-semibold">Removed Apps</h3>
+            <div className="space-y-2">
+              {removedApps.map(({ name }) => (
+                <RemovedAppItem
+                  key={name}
+                  icon={icons[name]}
+                  name={name}
+                />
+              ))}
+            </div>
+            <p className="mt-2 text-sm opacity-70">
+              Click + to restore an app to the active list.
+            </p>
+          </div>
+        )}
       </div>
-      {installedApps.length > 1 && (
-        <p className="mt-2 text-sm opacity-70">
-          Drag and drop to sort the list of apps.
-        </p>
-      )}
     </Pane>
   )
 }
